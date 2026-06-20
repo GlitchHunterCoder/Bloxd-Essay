@@ -296,7 +296,7 @@ Log: ["onBlockStand","tick","onPlayerClickUp","onPlayerClick"]
 
 The condition built into QuickJS that Bloxd registers: 
 
-```
+```js
 if (IU % 5000 == 0 && TU > MAX_RUNTIME_ALLOWED) {
   interrupt()
 }
