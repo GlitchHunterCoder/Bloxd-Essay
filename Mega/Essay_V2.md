@@ -60,6 +60,7 @@ Bloxd exposes a fixed set of global identifiers inside the QuickJS sandbox, orga
 - **Injected** — api, console, Date, myId, playerId, thisPos
 - **Introspective** — Reflect, Proxy
 - **Misc** — Math, eval, globalThis, JSON
+
 Two accessible intrinsics also exist: `GeneratorFunction` and `Generator` . Async functions can be declared but cannot be called — they throw _Error: Not a Function_ and have no prototype. 
 
 ## **Notable globalThis quirks** 
@@ -88,7 +89,7 @@ GET: Date
 |---|---|---|---|
 |SET ?|...allCallbacks|all or nothing|Sets engine-side callbacks|
 |SET|api, console, Date|always|Sets necessary values|
-|SET ?|myId, playerId,<br>thisPos|each independently optional|Sets code-block specifics|
+|SET|myId ?, playerId ?,<br>thisPos ?|each independently optional|Sets code-block specifics|
 |GET|api, console, Date|always — Date signals boot<br>end|Checks necessary values|
 - The injected set is re-applied on _every_ execution, not just at startup. 
 - Callbacks are registered when the engine GETs each callback name after the first world-code run. 
