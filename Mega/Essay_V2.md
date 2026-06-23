@@ -425,7 +425,7 @@ No consensus was reached: optimise for fewer IU increments (avoid hitting 5,000)
 
 for high TU limit -> optimize TU
 - custom game lobbies
-- 
+
 low TU limit -> optimize TU or IU
 - classic world lobbies
 
