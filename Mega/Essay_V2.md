@@ -425,12 +425,14 @@ No consensus was reached: optimise for fewer IU increments (avoid hitting 5,000)
 
 for high TU limit -> optimize TU
 - custom game lobbies
+- 
 low TU limit -> optimize TU or IU
 - classic world lobbies
 
 1st is 100% about TU, cuase there can be __many__ 5k checks, so better not to rely on it, but focus on actual efficiency 
 
-2nd is about one or two 5k checks, so "IU optimization" can matter here sometimes, but TU will remain higher priority because: low IU -> high TU -> pressure on rate limiter (beside being affected by bad runtime limit itself). 
+2nd is about one or two 5k checks, so "IU optimization" can matter here sometimes, but TU will remain higher priority because:
+- low IU -> high TU -> pressure on rate limiter (beside being affected by bad runtime limit itself). 
 
 it is also recommended to minize IU, when it does not hurt TU efficiency
 e.g  `do..while`  loop
