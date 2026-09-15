@@ -117,6 +117,7 @@ function more(data) {
 - only way to tell rankings, is based off these
 - the way we find these is by by thinking of the formula as F(5 argsA) > F(5 ArgsB)
 - and creating a space which we can work with, aka we can ask which is bigger than which, but not by how much
+### Rankings Only
 ```js
 "rankCategories": [
     {
@@ -129,6 +130,7 @@ function more(data) {
     }
 ]
 ```
+Is all we can see, and from that it isnt much so we have to be pretty inventive as to how we solve that, and as youll see we took some wild approach
 ## The Solution
 ### Formula Space
 ```js
@@ -182,7 +184,8 @@ e = −y
 a + b + c = 0
 d + e = 0
 ```
-so thats the theory, in pratice, we just batched the 3 exponent version to see what worked, and some time later
+so thats the theory, in pratice, we just batched the 3 exponent version to see what worked, now note there are mathematical tests we can use to verify that those specific exponents are the case, but ill save those for a later chapter and so some time later
+
 ### THE MOMENT YOU HAVE BEEN WAITING FOR
 ```js
 // FINAL FORMULA
@@ -241,8 +244,8 @@ similar reasoning can be followed for the rest, so the way to get your game on l
 - Keep `plays` high This is your driving force: the higher it goes, the more it pushes your chances of getting onto the big board
 - This drives BOTH:
   - `retention` — ×1 exponent
-  - `playsPerDay` — ×075 exponent
-- Combined, this gives `plays` a **×175 exponent** No wonder it is the most valuable stat
+  - `playsPerDay` — ×0.75 exponent
+- Combined, this gives `plays` a **×1.75 exponent** No wonder it is the most valuable stat
 
 So, assuming all other stats don't change:
 
@@ -368,6 +371,10 @@ the relationships between them.
   - + totalPlaytimeMs
 > Player to Stats
 
+Now for this, we can also factor in something we didnt add in before, 1 stat decreasing without a relevent increase often doesnt happen
+So below we will also factor in what other stats naturally change
+We will assume that a games stats will either increase linearly, `Plays`, or not increase as based on game itself, `avgPlaytimeMinutes`
+
 - **Plays**
   - Means the total amount of plays which the game has gotten.
   - More/less plays of your game.
@@ -402,3 +409,36 @@ the relationships between them.
     retention decreases.
   - Therefore, attracting unique players is useful when those
     players also generate enough additional plays
+### STATS
+
+Now that we know the relationships between players and stats, we can
+ask how to reinforce the statistics we want while preventing the
+statistics we do not want from hindering us.
+
+For every statistic, we consider not only how to change it, but what
+other statistics naturally change alongside it.
+
+A statistic should therefore not be considered a gain or drain in
+isolation. What matters is the resulting change to the relationships
+used by the formula.
+
+- **GAIN**
+  - **Plays**
+    - **Method to Increase Stat**
+      - Design Aspect
+      - Player Action
+      - Naturally Changed Stats
+      - Tradeoff
+      - Estimated Gains
+  - **totalPlaytimeMs**
+
+- **DRAIN**
+  - **activeDays**
+    - **Method to Minimize Its Effect**
+      - Design Aspect
+      - Player Action
+      - Naturally Changed Stats
+      - Tradeoff
+      - Estimated Effect
+  - **playtimeSamples**
+  - **uniquePlayers**
