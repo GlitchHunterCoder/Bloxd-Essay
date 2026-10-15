@@ -453,7 +453,7 @@ fn bloxd_liquid_light(s: bloxd_Surface, l: bloxd_LightIn) -> bloxd_Light {}
 
 </summary>
 
-```glsl
+```wgsl
 // Engine-provided and read-only to packs. apiVersion 2.
 
 struct BloxdPackInputs {
