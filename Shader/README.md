@@ -36,12 +36,12 @@ MyShader/
 - Pack.json
 ```js
 {
-    "apiVersion": 1,
+    "apiVersion": 2,
     "name": "My Pack"
     "author": "optional name"
 }
 ```
-apiVersion must be 1
+apiVersion must be 2
 name can be whatever you want
 author is optional
 note from dev before we begin
@@ -433,6 +433,14 @@ fn bloxd_defaultSurface(s: bloxd_SurfaceIn) -> bloxd_Surface {
 fn bloxd_defaultLight(s: bloxd_Surface, l: bloxd_LightIn) -> bloxd_Light {
     return bloxd_Light(l.engineColour + s.emission * l.fogFactor);
 }
+
+fn bloxd_terrain_vertex(v: bloxd_VertexIn) -> bloxd_Vertex {}
+fn bloxd_terrain_surface(v: bloxd_SurfaceIn) -> bloxd_Surface {}
+fn bloxd_terrain_light(s: bloxd_Surface, l: bloxd_LightIn) -> bloxd_Light {}
+
+fn bloxd_liquid_vertex(v: bloxd_VertexIn) -> bloxd_Vertex {}
+fn bloxd_liquid_surface(v: bloxd_SurfaceIn) -> bloxd_Surface {}
+fn bloxd_liquid_light(s: bloxd_Surface, l: bloxd_LightIn) -> bloxd_Light {}
 ```
 
 </details>
@@ -568,6 +576,14 @@ fn bloxdApplyFog(colour: vec3f, l: BloxdLightIn) -> vec3f {
 fn bloxdDefaultLight(s: BloxdSurface, l: BloxdLightIn) -> BloxdLight {
     return BloxdLight(l.engineColour + s.emission * l.fogVisibility);
 }
+
+fn bloxdTerrainVertex(vertex: bloxdVertexIn) -> bloxdVertex {}
+fn bloxdTerrainSurface(vertex: bloxdSurfaceIn) -> bloxdSurface {}
+fn bloxdTerrainLight(surface: bloxdSurface, light: bloxdLightIn) -> bloxdLight {}
+
+fn bloxdLiquidVertex(vertex: bloxdVertexIn) -> bloxdVertex {}
+fn bloxdLiquidSurface(vertex: bloxdSurfaceIn) -> bloxdSurface {}
+fn bloxdLiquidLight(surface: bloxdSurface, light: bloxdLightIn) -> bloxdLight {}
 ```
 
 </details>
