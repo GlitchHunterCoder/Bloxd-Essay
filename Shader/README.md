@@ -44,6 +44,13 @@ MyShader/
 apiVersion must be 1
 name can be whatever you want
 author is optional
+note from dev before we begin
+```wgsl
+// Engine-provided and read-only to packs. apiVersion 2.
+
+// Per frame: the same for every vertex and fragment of a frame. The functions read the engine's uniforms, so any
+// function can call them, not only a hook.
+```
 
 </details>
 
@@ -86,61 +93,72 @@ BLOXD_SCENE_DEPTH // not too sure
 
 These can be thought as types
 ```wgsl
-struct bloxd_VertexIn {
-    position: vec3f,  // noa-local world space (world minus originOffset)
+// === INTERNAL ===
+
+struct BloxdPackInputs {
+    time: f32,
+    originOffset: vec3i,
+    sunDirection: vec3f,
+    eyePosition: vec3f,
+}
+@group(3) @binding(0) var<uniform> bloxdPackInputs: BloxdPackInputs;
+
+// === EXTERNAL ===
+
+struct BloxdVertexIn {
+    position: vec3f,     // noa-local: world minus bloxdOriginOffset()
     normal: vec3f,
-    originOffset: vec3i, // whole blocks
-    time: f32, // seconds, wrapped every 3600 s (part of the API)
+    blockId: u32,        // the block whose face this is, by its block ID, the same across the face
 }
 
-#ifndef BLOXD_STRICT //exists only if not STRICT
-struct bloxd_Vertex { 
-    position: vec3f, // noa-local
+struct BloxdVertex {
+    position: vec3f,     // noa-local
 }
-#endif
 
-struct bloxd_SurfaceIn {
-    colour: vec3f, // texture x vertex colour (tint x AO, baked together by the mesher in v1)
+struct BloxdSurfaceIn {
+    colour: vec3f,       // texture x vertex colour (tint x AO, baked together by the mesher)
     alpha: f32,
     normal: vec3f,
-    position: vec3f, // noa-local
-    originOffset: vec3i, // a face's world block is vec3i(floor(position - normal * 0.5)) + originOffset
-    eyePosition: vec3f, // noa-local
-    time: f32,
-    sunDirection: vec3f, // unit, towards the sun, in world orientation; zero when the sky has no sun
+    position: vec3f,     // noa-local; see bloxdWorldPosition and bloxdFaceBlock
+    blockId: u32,        // as in BloxdVertexIn
 }
 
-struct bloxd_Surface {
+struct BloxdSurface {
     colour: vec3f,
 #ifdef BLOXD_ALPHA
-    alpha: f32, //if ALPHA is being used, allow alpha value to be passed
+    alpha: f32,
 #endif
-    emission: vec3f, // added after lighting, then fogged
+    emission: vec3f,     // added after lighting, then fogged
 }
 
-struct bloxd_LightIn {
-    engineColour: vec3f, // the engine's result for this fragment, from the surface hook's colour
-    directional: f32, // summed Lambert from the scene's directional lights (0 when off)
-    ambient: vec3f, // the material's ambient times the scene's
-#ifdef BLOXD_LIGHTING //if LIGHTING used, allow these extra keys
-    blockLight: vec3f, // voxel block light, tone-mapped
-    skyLight: f32, // voxel sky light, tone-mapped
-    ambientLightColour: vec3f,
-    skyLightColour: vec3f,
-    heldLight: vec3f, // held light here, tone-mapped like blockLight, before the ambient boost; 0 out of reach
-#endif
-    fogColour: vec3f,
-    fogFactor: f32, // 1 = no fog, 0 = fully fogged
-    position: vec3f, // as in bloxd_SurfaceIn
+struct BloxdLightIn {
+    litColour: vec3f,    // the engine's lit result for this fragment, from the surface hook's colour: before emission and fog
+    engineColour: vec3f, // the same after fog, bloxdApplyFog(litColour, l); bloxdDefaultLight adds the emission
+    directional: f32,    // summed Lambert from the scene's directional lights (0 when off)
+    ambient: vec3f,      // the material's ambient times the scene's
+    blockLight: vec3f,   // voxel block light, tone-mapped; 0 without BLOXD_LIGHTING
+    skyLight: f32,       // voxel sky light, tone-mapped; 1 without BLOXD_LIGHTING
+    ambientLightColour: vec3f, // white without BLOXD_LIGHTING
+    skyLightColour: vec3f,     // white without BLOXD_LIGHTING
+    heldLight: vec3f,    // held light here, tone-mapped like blockLight, before the ambient boost; 0 out of reach
+                         // or without BLOXD_LIGHTING
+    fogColour: vec3f,    // the game's fog colour. Bloxd's games always have fog, pushed far out when the player
+                         // turns it off; black only in a scene with no fog at all
+    fogVisibility: f32,  // 1 = no fog, 0 = fully fogged
+    position: vec3f,     // as in BloxdSurfaceIn
     normal: vec3f,
-    originOffset: vec3i,
-    eyePosition: vec3f,
-    time: f32,
-    sunDirection: vec3f,
+    blockId: u32,        // as in BloxdVertexIn
 }
 
-struct bloxd_Light {
+struct BloxdLight {
     colour: vec3f,
+}
+
+// Returned by bloxdOpaqueBehind(), which surface and light hooks may call where BLOXD_SCENE_DEPTH is defined.
+struct BloxdOpaqueBehind {
+    found: bool,         // false where nothing opaque is behind (sky)
+    position: vec3f,     // noa-local; meaningless when !found
+    distance: f32,       // from the eye; meaningless when !found
 }
 ```
 
@@ -156,25 +174,62 @@ struct bloxd_Light {
   
 you call these functions to see what bloxd would do, from there you can edit that result
 ```wgsl
-#ifndef BLOXD_STRICT //only work if STRICT mode
-// takes a vertex in
-fn bloxd_defaultVertex(v: bloxd_VertexIn) -> bloxd_Vertex { //return a position
-    return bloxd_Vertex(v.position);
-}
-#endif
+// === HELPER API ===
 
-//
-fn bloxd_defaultSurface(s: bloxd_SurfaceIn) -> bloxd_Surface { //return color, and alpha if using
+// bloxdTime() returns to 0 every this many seconds.
+const bloxdTimeWrap: f32 = 3600;
+
+// Seconds, returning to 0 every bloxdTimeWrap.
+fn bloxdTime() -> f32 {
+    return bloxdPackInputs.time;
+}
+
+// Whole blocks: a noa-local position plus this is a world position.
+fn bloxdOriginOffset() -> vec3i {
+    return bloxdPackInputs.originOffset;
+}
+
+// The camera's position, noa-local.
+fn bloxdEyePosition() -> vec3f {
+    return bloxdPackInputs.eyePosition;
+}
+
+// Unit, towards the sun, in world orientation; zero when the sky has no sun.
+fn bloxdSunDirection() -> vec3f {
+    return bloxdPackInputs.sunDirection;
+}
+
+// A noa-local position in world coordinates. In f32, so it loses fine detail far from the world's origin.
+fn bloxdWorldPosition(position: vec3f) -> vec3f {
+    return position + vec3f(bloxdOriginOffset());
+}
+
+// The world block the face at a fragment's position and normal belongs to, exact anywhere: half a block back inside it.
+fn bloxdFaceBlock(position: vec3f, normal: vec3f) -> vec3i {
+    return vec3i(floor(position - normal * 0.5)) + bloxdOriginOffset();
+}
+
+// Fogs colour as the engine fogs this fragment.
+fn bloxdApplyFog(colour: vec3f, l: BloxdLightIn) -> vec3f {
+    return mix(l.fogColour, colour, l.fogVisibility);
+}
+
+// === BLOXD SHADER ===
+
+fn bloxdDefaultVertex(v: BloxdVertexIn) -> BloxdVertex {
+    return BloxdVertex(v.position);
+}
+
+fn bloxdDefaultSurface(s: BloxdSurfaceIn) -> BloxdSurface {
 #ifdef BLOXD_ALPHA
-    return bloxd_Surface(s.colour, s.alpha, vec3f(0.0));
+    return BloxdSurface(s.colour, s.alpha, vec3f(0.0));
 #else
-    return bloxd_Surface(s.colour, vec3f(0.0));
+    return BloxdSurface(s.colour, vec3f(0.0));
 #endif
 }
 
-//given a surface, and engine light obj
-fn bloxd_defaultLight(s: bloxd_Surface, l: bloxd_LightIn) -> bloxd_Light { //return a color
-    return bloxd_Light(l.engineColour + s.emission * l.fogFactor);
+fn bloxdDefaultLight(s: BloxdSurface, l: BloxdLightIn) -> BloxdLight {
+    return BloxdLight(l.engineColour + s.emission * l.fogVisibility);
 }
 ```
 
@@ -191,13 +246,13 @@ fn bloxd_defaultLight(s: bloxd_Surface, l: bloxd_LightIn) -> bloxd_Light { //ret
 You return the results back into these callbacks
 
 ```wgsl
-fn bloxd_terrain_vertex(v: bloxd_VertexIn) -> bloxd_Vertex {} //pos
-fn bloxd_terrain_surface(v: bloxd_SurfaceIn) -> bloxd_Surface {} //color, alpha
-fn bloxd_terrain_light(s: bloxd_Surface, l: bloxd_LightIn) -> bloxd_Light {} //color
+fn bloxdTerrainVertex(vertex: bloxdVertexIn) -> bloxdVertex {}
+fn bloxdTerrainSurface(vertex: bloxdSurfaceIn) -> bloxdSurface {}
+fn bloxdTerrainLight(surface: bloxdSurface, light: bloxdLightIn) -> bloxdLight {}
 
-fn bloxd_liquid_vertex(v: bloxd_VertexIn) -> bloxd_Vertex {} //pos
-fn bloxd_liquid_surface(v: bloxd_SurfaceIn) -> bloxd_Surface {} //color, alpha
-fn bloxd_liquid_light(s: bloxd_Surface, l: bloxd_LightIn) -> bloxd_Light {} //color
+fn bloxdLiquidVertex(vertex: bloxdVertexIn) -> bloxdVertex {}
+fn bloxdLiquidSurface(vertex: bloxdSurfaceIn) -> bloxdSurface {}
+fn bloxdLiquidLight(surface: bloxdSurface, light: bloxdLightIn) -> bloxdLight {}
 ```
 
 </details>
@@ -213,14 +268,14 @@ fn bloxd_liquid_light(s: bloxd_Surface, l: bloxd_LightIn) -> bloxd_Light {} //co
 </summary>
 
 ```wgsl
-fn bloxd_terrain_surface(s: bloxd_SurfaceIn) -> bloxd_Surface {
-    return bloxd_defaultSurface(s);
+fn bloxdTerrainSurface(s: bloxdSurfaceIn) -> bloxdSurface {
+    return bloxdDefaultSurface(s);
 }
 //shader just returns what was given in
 ```
 ```wgsl
-fn bloxd_terrain_surface(s: bloxd_SurfaceIn) -> bloxd_Surface {
-    var result = bloxd_defaultSurface(s);
+fn bloxdTerrainSurface(s: bloxdSurfaceIn) -> bloxdSurface {
+    var result = bloxdDefaultSurface(s);
     result.colour = vec3f(0.0) + 0.5 * result.colour;
     return result;
 }
@@ -228,8 +283,8 @@ fn bloxd_terrain_surface(s: bloxd_SurfaceIn) -> bloxd_Surface {
 //Change the 0.0 or 0.5 see what happens
 ```
 ```wgsl
-fn bloxd_terrain_surface(s: bloxd_SurfaceIn) -> bloxd_Surface {
-    var result = bloxd_defaultSurface(s);
+fn bloxdTerrainSurface(s: bloxdSurfaceIn) -> bloxdSurface {
+    var result = bloxdDefaultSurface(s);
     let pulse = 0.5 + 0.5 * sin(s.time * 3.0); //what if its greater than 3.0 ?
     result.colour = vec3f(pulse, 0.0, 0.0);
     return result;
@@ -238,8 +293,8 @@ fn bloxd_terrain_surface(s: bloxd_SurfaceIn) -> bloxd_Surface {
 ```
 - full example
 ```wgsl
-fn bloxd_terrain_surface(s: bloxd_SurfaceIn) -> bloxd_Surface {
-    var result = bloxd_defaultSurface(s);
+fn bloxdTerrainSurface(s: bloxdSurfaceIn) -> bloxdSurface {
+    var result = bloxdDefaultSurface(s);
 
     // Get the block's world position
     let worldPos = s.position + vec3f(s.originOffset);
@@ -294,7 +349,14 @@ fn bloxd_terrain_surface(s: bloxd_SurfaceIn) -> bloxd_Surface {
 
 </summary>
 
-## > GLSL String found
+<details>
+
+<summary>
+
+## Version 1
+
+</summary>
+
 ```wgsl
 // Engine-provided and read-only to packs. apiVersion 1.
 struct bloxd_VertexIn {
@@ -373,56 +435,142 @@ fn bloxd_defaultLight(s: bloxd_Surface, l: bloxd_LightIn) -> bloxd_Light {
 }
 ```
 
-## > Source Code
-```js
-const iy = {
-    terrain: {
-        vertex: "bloxd_terrain_vertex",
-        surface: "bloxd_terrain_surface",
-        GR: "bloxd_terrain_light"
-    },
-    liquid: {
-        vertex: "bloxd_liquid_vertex",
-        surface: "bloxd_liquid_surface",
-        GR: "bloxd_liquid_light"
-    }
+</details>
+
+<details>
+
+<summary>
+
+## Version 2
+
+</summary>
+
+```glsl
+// Engine-provided and read-only to packs. apiVersion 2.
+
+struct BloxdPackInputs {
+    time: f32,
+    originOffset: vec3i,
+    sunDirection: vec3f,
+    eyePosition: vec3f,
 }
-  , Vs = ["vertex", "surface", "GR"]
-  , os = new Set([].concat(...Object.values(iy).map((ss => Object.values(ss)))));
-function Xs(ss) {
-    for (const ys of Object.values(iy))
-        for (const vs of Vs)
-            if (ys[vs] === ss)
-                return vs;
-    return null
+@group(3) @binding(0) var<uniform> bloxdPackInputs: BloxdPackInputs;
+
+// Per frame: the same for every vertex and fragment of a frame. The functions read the engine's uniforms, so any
+// function can call them, not only a hook.
+
+// bloxdTime() returns to 0 every this many seconds.
+const bloxdTimeWrap: f32 = 3600;
+
+// Seconds, returning to 0 every bloxdTimeWrap.
+fn bloxdTime() -> f32 {
+    return bloxdPackInputs.time;
 }
-const Ws = {
-    vertex: {
-        params: [{
-            name: "v",
-            type: "bloxd_VertexIn"
-        }],
-        returns: "bloxd_Vertex"
-    },
-    surface: {
-        params: [{
-            name: "s",
-            type: "bloxd_SurfaceIn"
-        }],
-        returns: "bloxd_Surface"
-    },
-    GR: {
-        params: [{
-            name: "s",
-            type: "bloxd_Surface"
-        }, {
-            name: "l",
-            type: "bloxd_LightIn"
-        }],
-        returns: "bloxd_Light"
-    }
-};
+
+// Whole blocks: a noa-local position plus this is a world position.
+fn bloxdOriginOffset() -> vec3i {
+    return bloxdPackInputs.originOffset;
+}
+
+// The camera's position, noa-local.
+fn bloxdEyePosition() -> vec3f {
+    return bloxdPackInputs.eyePosition;
+}
+
+// Unit, towards the sun, in world orientation; zero when the sky has no sun.
+fn bloxdSunDirection() -> vec3f {
+    return bloxdPackInputs.sunDirection;
+}
+
+// A noa-local position in world coordinates. In f32, so it loses fine detail far from the world's origin.
+fn bloxdWorldPosition(position: vec3f) -> vec3f {
+    return position + vec3f(bloxdOriginOffset());
+}
+
+// The world block the face at a fragment's position and normal belongs to, exact anywhere: half a block back inside it.
+fn bloxdFaceBlock(position: vec3f, normal: vec3f) -> vec3i {
+    return vec3i(floor(position - normal * 0.5)) + bloxdOriginOffset();
+}
+
+struct BloxdVertexIn {
+    position: vec3f,     // noa-local: world minus bloxdOriginOffset()
+    normal: vec3f,
+    blockId: u32,        // the block whose face this is, by its block ID, the same across the face
+}
+
+struct BloxdVertex {
+    position: vec3f,     // noa-local
+}
+
+struct BloxdSurfaceIn {
+    colour: vec3f,       // texture x vertex colour (tint x AO, baked together by the mesher)
+    alpha: f32,
+    normal: vec3f,
+    position: vec3f,     // noa-local; see bloxdWorldPosition and bloxdFaceBlock
+    blockId: u32,        // as in BloxdVertexIn
+}
+
+struct BloxdSurface {
+    colour: vec3f,
+#ifdef BLOXD_ALPHA
+    alpha: f32,
+#endif
+    emission: vec3f,     // added after lighting, then fogged
+}
+
+struct BloxdLightIn {
+    litColour: vec3f,    // the engine's lit result for this fragment, from the surface hook's colour: before emission and fog
+    engineColour: vec3f, // the same after fog, bloxdApplyFog(litColour, l); bloxdDefaultLight adds the emission
+    directional: f32,    // summed Lambert from the scene's directional lights (0 when off)
+    ambient: vec3f,      // the material's ambient times the scene's
+    blockLight: vec3f,   // voxel block light, tone-mapped; 0 without BLOXD_LIGHTING
+    skyLight: f32,       // voxel sky light, tone-mapped; 1 without BLOXD_LIGHTING
+    ambientLightColour: vec3f, // white without BLOXD_LIGHTING
+    skyLightColour: vec3f,     // white without BLOXD_LIGHTING
+    heldLight: vec3f,    // held light here, tone-mapped like blockLight, before the ambient boost; 0 out of reach
+                         // or without BLOXD_LIGHTING
+    fogColour: vec3f,    // the game's fog colour. Bloxd's games always have fog, pushed far out when the player
+                         // turns it off; black only in a scene with no fog at all
+    fogVisibility: f32,  // 1 = no fog, 0 = fully fogged
+    position: vec3f,     // as in BloxdSurfaceIn
+    normal: vec3f,
+    blockId: u32,        // as in BloxdVertexIn
+}
+
+struct BloxdLight {
+    colour: vec3f,
+}
+
+// Returned by bloxdOpaqueBehind(), which surface and light hooks may call where BLOXD_SCENE_DEPTH is defined.
+struct BloxdOpaqueBehind {
+    found: bool,         // false where nothing opaque is behind (sky)
+    position: vec3f,     // noa-local; meaningless when !found
+    distance: f32,       // from the eye; meaningless when !found
+}
+
+fn bloxdDefaultVertex(v: BloxdVertexIn) -> BloxdVertex {
+    return BloxdVertex(v.position);
+}
+
+fn bloxdDefaultSurface(s: BloxdSurfaceIn) -> BloxdSurface {
+#ifdef BLOXD_ALPHA
+    return BloxdSurface(s.colour, s.alpha, vec3f(0.0));
+#else
+    return BloxdSurface(s.colour, vec3f(0.0));
+#endif
+}
+
+// Fogs colour as the engine fogs this fragment.
+fn bloxdApplyFog(colour: vec3f, l: BloxdLightIn) -> vec3f {
+    return mix(l.fogColour, colour, l.fogVisibility);
+}
+
+fn bloxdDefaultLight(s: BloxdSurface, l: BloxdLightIn) -> BloxdLight {
+    return BloxdLight(l.engineColour + s.emission * l.fogVisibility);
+}
 ```
+
+</details>
 
 </details>
 
@@ -455,7 +603,7 @@ fn d(e: f32) -> f32 { return e * 2; }
 //note how you need variable, argument, and return types stated
 ```
 
-## Syntax
+### Syntax
 
 ```wgsl
 // For
