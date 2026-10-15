@@ -10,8 +10,7 @@
 
 <summary>
 
----
-## > Language
+## Language
 ---
 
 </summary>
@@ -52,7 +51,7 @@ author is optional
 
 <summary>
 
-### `Macros`
+### `> Macros`
 
 </summary>
 
@@ -81,7 +80,7 @@ BLOXD_SCENE_DEPTH // not too sure
 
 <summary>
 
-### `Struct`
+### `> Struct`
 
 </summary>
 
@@ -151,7 +150,7 @@ struct bloxd_Light {
 
 <summary>
 
-### `Api`
+### `> Api`
 
 </summary>
   
@@ -185,7 +184,7 @@ fn bloxd_defaultLight(s: bloxd_Surface, l: bloxd_LightIn) -> bloxd_Light { //ret
 
 <summary>
 
-### `Callbacks`
+### `> Callbacks`
 
 </summary>
 
@@ -207,9 +206,9 @@ fn bloxd_liquid_light(s: bloxd_Surface, l: bloxd_LightIn) -> bloxd_Light {} //co
 
 <summary>
   
----
-## > Example
 
+## Example
+---
 
 </summary>
 
@@ -267,7 +266,7 @@ fn bloxd_terrain_surface(s: bloxd_SurfaceIn) -> bloxd_Surface {
 <summary>
 
 
-## > Credits
+## Credits
 ---
 
 </summary>
@@ -291,7 +290,7 @@ fn bloxd_terrain_surface(s: bloxd_SurfaceIn) -> bloxd_Surface {
   
 <summary>
   
-# Reference
+> # REFERENCES
 
 </summary>
 
@@ -431,7 +430,7 @@ const Ws = {
   
 <summary>
 
-# Rough Tutorial of WGSL
+> # ROUGH TUTORIAL OF `WGSL`
 
 </summary>
 
