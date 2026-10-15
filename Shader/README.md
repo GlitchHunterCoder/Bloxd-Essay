@@ -6,8 +6,6 @@ Docs for that can be found with URL below, that is its own seperate subject and 
 Those are best docs i could find, but be aware there are multiple docs so if you find better alternatives let me know
 for now ill leave rough understanding here and summary from above here
 
-
-
 Now this isnt the only thing used, bloxd also has callbacks in the sense that bloxd calls apon these for usage
 Those will be listed below
 but first, file structure
@@ -34,7 +32,7 @@ author is optional
 # Bloxd Shader API
 ## Macros
 these are toggles in your code, based on how and where its used, will alter your code and or api as well
-```glsl
+```wgsl
 BLOXD_STRICT // "use strict" of shaders, prevent stuff like `discard;` from being used
 BLOXD_LIGHTING // bloxd lighting toggle
 BLOXD_ALPHA // is shader accepting alpha values
@@ -53,7 +51,7 @@ BLOXD_SCENE_DEPTH // not too sure
 ```
 ## Struct
 These can be thought as types
-```glsl
+```wgsl
 struct bloxd_VertexIn {
     position: vec3f,  // noa-local world space (world minus originOffset)
     normal: vec3f,
@@ -113,7 +111,7 @@ struct bloxd_Light {
 ```
 ## API
 you call these functions to see what bloxd would do, from there you can edit that result
-```glsl
+```wgsl
 #ifndef BLOXD_STRICT //only work if STRICT mode
 // takes a vertex in
 fn bloxd_defaultVertex(v: bloxd_VertexIn) -> bloxd_Vertex { //return a position
@@ -137,7 +135,7 @@ fn bloxd_defaultLight(s: bloxd_Surface, l: bloxd_LightIn) -> bloxd_Light { //ret
 ```
 ## Callbacks
 You return the results back into these callbacks
-```glsl
+```wgsl
 fn bloxd_terrain_vertex(v: bloxd_VertexIn) -> bloxd_Vertex {} //pos
 fn bloxd_terrain_surface(v: bloxd_SurfaceIn) -> bloxd_Surface {} //color, alpha
 fn bloxd_terrain_light(s: bloxd_Surface, l: bloxd_LightIn) -> bloxd_Light {} //color
@@ -147,13 +145,13 @@ fn bloxd_liquid_surface(v: bloxd_SurfaceIn) -> bloxd_Surface {} //color, alpha
 fn bloxd_liquid_light(s: bloxd_Surface, l: bloxd_LightIn) -> bloxd_Light {} //color
 ```
 # Example
-```glsl
+```wgsl
 fn bloxd_terrain_surface(s: bloxd_SurfaceIn) -> bloxd_Surface {
     return bloxd_defaultSurface(s);
 }
 //shader just returns what was given in
 ```
-```glsl
+```wgsl
 fn bloxd_terrain_surface(s: bloxd_SurfaceIn) -> bloxd_Surface {
     var result = bloxd_defaultSurface(s);
     result.colour = vec3f(0.0) + 0.5 * result.colour;
@@ -162,7 +160,7 @@ fn bloxd_terrain_surface(s: bloxd_SurfaceIn) -> bloxd_Surface {
 //shader which makes all darker
 //Change the 0.0 or 0.5 see what happens
 ```
-```glsl
+```wgsl
 fn bloxd_terrain_surface(s: bloxd_SurfaceIn) -> bloxd_Surface {
     var result = bloxd_defaultSurface(s);
     let pulse = 0.5 + 0.5 * sin(s.time * 3.0); //what if its greater than 3.0 ?
@@ -172,7 +170,7 @@ fn bloxd_terrain_surface(s: bloxd_SurfaceIn) -> bloxd_Surface {
 //Pulsing animation
 ```
 - full example
-```glsl
+```wgsl
 fn bloxd_terrain_surface(s: bloxd_SurfaceIn) -> bloxd_Surface {
     var result = bloxd_defaultSurface(s);
 
@@ -214,7 +212,7 @@ fn bloxd_terrain_surface(s: bloxd_SurfaceIn) -> bloxd_Surface {
 </summary>
 
 ### GLSL String found
-```glsl
+```wgsl
 // Engine-provided and read-only to packs. apiVersion 1.
 struct bloxd_VertexIn {
     position: vec3f,     // noa-local world space (world minus originOffset)
@@ -367,7 +365,7 @@ let c = 3;
 function d(e) { return e * 2; }
 ```
 
-```glsl
+```wgsl
 var a: f32 = 1;
 let c: f32 = 3;
 fn d(e: f32) -> f32 { return e * 2; }
@@ -376,7 +374,7 @@ fn d(e: f32) -> f32 { return e * 2; }
 
 ## Syntax
 
-```glsl
+```wgsl
 // For
 for (var i = 0; i < 10; i++) { ... }
 
@@ -448,7 +446,7 @@ so unlike JS, WGSL is a strongly typed language, so it needs to know the type of
 ### Inference
 so instead of having to declare all your types, it can infer your type
 - Simple
-```glsl
+```wgsl
 fn f() -> bool { return false; }
 
 // 32 Bit
@@ -469,7 +467,7 @@ fn f() -> bool { return false; }
 f() // inferred as bool
 ```
 - Vector
-```glsl
+```wgsl
 let a = vec4<f32>(1, 2, 3, 4);
 let b = vec4f(1, 2, 3, 4);
 // both are same type
@@ -477,7 +475,7 @@ let b = vec4f(1, 2, 3, 4);
 
 ### Types
 - Simple Types
-```glsl
+```wgsl
 i32  // 32 bit signed int
 u32  // 32 bit unsigned int
 f32  // 32 bit float
@@ -488,14 +486,14 @@ AbstractInt // undecided int type
 AbstractFloat // undecided float type
 ```
 - Read/Write
-```glsl
+```wgsl
 var a = 1 // is equivalent of `let` in JS
 let b = 1 // is equivalent of `const` in JS
 
 const c = 1 // is a compile time constant
 ```
 - Vectors
-```glsl
+```wgsl
 // Declare
 let a = vec4<f32>(1, 2, 3, 4); // 4 f32 s
 let b = vec4<f32>(4, 3, 2, 1); // 4 f32 s
@@ -531,7 +529,7 @@ a - b; // vec4f(-3, -1, 1, 3)
 mix(a, b) // vec4f(1, 2, 2, 1)
 ```
 - Matrix
-```glsl
+```wgsl
 // `mat[numVectors]x[vectorSize]<[type]>`
 let a: mat4x4<f32> = ...
 let b: mat4x4f = ...
@@ -542,13 +540,13 @@ a[2];   // vec4f of the 3rd vector of a
 a * v;  // vec4f and the result of a * b ( * being used as dot product )
 ```
 - Array
-```glsl
+```wgsl
 // `array<[type],[numElements]>`
 let a = array<f32, 5>;   // an array of five f32s
 let b = array(vec3f(1,2,3), vec3f(4,5,6), vec3f(7,8,9));
 ```
 - Function
-```glsl
+```wgsl
 // `fn [name]([params]) -> [returnType] {[body]}`
 fn add(a: f32, b: f32) -> f32 {
   return a + b;
@@ -556,13 +554,13 @@ fn add(a: f32, b: f32) -> f32 {
 ```
 ## Conversion
 Since it is a strongly typed language you cant auto convert one to another
-```glsl
+```wgsl
 let a = 1;     // a is an i32
 let b = 2.0;   // b is a f32
 let c = a + b; // ERROR can't add an i32 to an f32
 ```
 and instead must do
-```glsl
+```wgsl
 let a = 1; // a is an i32
 let b = 2.0; // b is a f32
 let c = f32(a) + b; // ok
