@@ -1,5 +1,21 @@
-# SHADER Essay
-# Language
+<details>
+  
+<summary>
+
+> # SHADER ESSAY
+
+</summary>
+
+<details>
+
+<summary>
+
+---
+## > Language
+---
+
+</summary>
+
 This is coded in 1 specific shader language: WGSL (**W**eb**G**pu **S**hader **L**anguage)
 Docs for that can be found with URL below, that is its own seperate subject and even idk how it works entirely just yet
 `webgpufundamentals.org/webgpu/lessons/webgpu-wgsl.html`
@@ -29,8 +45,17 @@ MyShader/
 apiVersion must be 1
 name can be whatever you want
 author is optional
-# Bloxd Shader API
-## Macros
+
+</details>
+
+<details>
+
+<summary>
+
+### `Macros`
+
+</summary>
+
 these are toggles in your code, based on how and where its used, will alter your code and or api as well
 ```wgsl
 BLOXD_STRICT // "use strict" of shaders, prevent stuff like `discard;` from being used
@@ -49,7 +74,17 @@ BLOXD_SCENE_DEPTH // not too sure
 
 //#ifndef //if NOT defined, the negation of ifdef
 ```
-## Struct
+
+</details>
+
+<details>
+
+<summary>
+
+### `Struct`
+
+</summary>
+
 These can be thought as types
 ```wgsl
 struct bloxd_VertexIn {
@@ -109,7 +144,17 @@ struct bloxd_Light {
     colour: vec3f,
 }
 ```
-## API
+
+</details>
+
+<details>
+
+<summary>
+
+### `Api`
+
+</summary>
+  
 you call these functions to see what bloxd would do, from there you can edit that result
 ```wgsl
 #ifndef BLOXD_STRICT //only work if STRICT mode
@@ -133,8 +178,19 @@ fn bloxd_defaultLight(s: bloxd_Surface, l: bloxd_LightIn) -> bloxd_Light { //ret
     return bloxd_Light(l.engineColour + s.emission * l.fogFactor);
 }
 ```
-## Callbacks
+
+</details>
+
+<details>
+
+<summary>
+
+### `Callbacks`
+
+</summary>
+
 You return the results back into these callbacks
+
 ```wgsl
 fn bloxd_terrain_vertex(v: bloxd_VertexIn) -> bloxd_Vertex {} //pos
 fn bloxd_terrain_surface(v: bloxd_SurfaceIn) -> bloxd_Surface {} //color, alpha
@@ -144,7 +200,19 @@ fn bloxd_liquid_vertex(v: bloxd_VertexIn) -> bloxd_Vertex {} //pos
 fn bloxd_liquid_surface(v: bloxd_SurfaceIn) -> bloxd_Surface {} //color, alpha
 fn bloxd_liquid_light(s: bloxd_Surface, l: bloxd_LightIn) -> bloxd_Light {} //color
 ```
-# Example
+
+</details>
+
+<details>
+
+<summary>
+  
+---
+## > Example
+
+
+</summary>
+
 ```wgsl
 fn bloxd_terrain_surface(s: bloxd_SurfaceIn) -> bloxd_Surface {
     return bloxd_defaultSurface(s);
@@ -191,7 +259,19 @@ fn bloxd_terrain_surface(s: bloxd_SurfaceIn) -> bloxd_Surface {
     return result;
 }
 ```
-# Credits
+
+</details>
+
+<details>
+
+<summary>
+
+
+## > Credits
+---
+
+</summary>
+
 - `GlitchHunter` me: for documentating and data mining for shaders
 - `_Xenon_`: for making these shaders and thus helping to pave the way for new shaders
 - `Cannoli`: for reverse engineering shader activation, and needed data
@@ -203,15 +283,19 @@ fn bloxd_terrain_surface(s: bloxd_SurfaceIn) -> bloxd_Surface {
 - `nervousking` `SUSSYPRIME` //seen it be developed
 - `KingCobra` //wanted to see shaders working
 
+</details>
+
+</details>
+
 <details>
   
 <summary>
   
-## Reference
+# Reference
 
 </summary>
 
-### GLSL String found
+## > GLSL String found
 ```wgsl
 // Engine-provided and read-only to packs. apiVersion 1.
 struct bloxd_VertexIn {
@@ -290,7 +374,7 @@ fn bloxd_defaultLight(s: bloxd_Surface, l: bloxd_LightIn) -> bloxd_Light {
 }
 ```
 
-### Source Code
+## > Source Code
 ```js
 const iy = {
     terrain: {
@@ -347,7 +431,7 @@ const Ws = {
   
 <summary>
 
-## Rough Tutorial of WGSL
+# Rough Tutorial of WGSL
 
 </summary>
 
