@@ -336,6 +336,9 @@ fn bloxdTerrainSurface(s: bloxdSurfaceIn) -> bloxdSurface {
 - `Crownix` //wanted to be pinged for findings like these
 - `nervousking` `SUSSYPRIME` //seen it be developed
 - `KingCobra` //wanted to see shaders working
+# Other Works
+- `BloxdZetta`: https://github.com/BloxdZetta/Full-Shader-Guide/blob/main/README.md
+- `imu31465`: https://github.com/imu31465/Bloxd.io-How-To-Make-Shader-Packs
 
 </details>
 
