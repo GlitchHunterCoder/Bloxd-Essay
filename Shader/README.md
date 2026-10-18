@@ -44,6 +44,12 @@ MyShader/
 apiVersion must be 2
 name can be whatever you want
 author is optional
+
+NOTES ON FINDINGS which differ from SPECS:
+- Bloxd's shader compiler supports pointers to mutable function-local variables, struct members, array elements, nested members, and whole composite values.
+- Pointers can be stored in let variables, forwarded between functions, dereferenced for reading and writing, and used to mutate the original storage.
+- Pointer-to-pointer storage and first-class function references have not been demonstrated; the tested forms are rejected by the compiler.
+
 note from dev before we begin
 ```wgsl
 // Engine-provided and read-only to packs. apiVersion 2.
