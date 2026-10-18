@@ -136,7 +136,7 @@ struct BloxdLightIn {
     engineColour: vec3f, // the same after fog, bloxdApplyFog(litColour, l); bloxdDefaultLight adds the emission
     directional: f32,    // summed Lambert from the scene's directional lights (0 when off)
     ambient: vec3f,      // the material's ambient times the scene's
-#ifdef BLOXD_ALPHA
+#ifdef BLOXD_LIGHTING
     blockLight: vec3f,   // voxel block light, tone-mapped; 0 without BLOXD_LIGHTING
     skyLight: f32,       // voxel sky light, tone-mapped; 1 without BLOXD_LIGHTING
     ambientLightColour: vec3f, // white without BLOXD_LIGHTING
