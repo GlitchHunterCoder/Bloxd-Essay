@@ -136,12 +136,14 @@ struct BloxdLightIn {
     engineColour: vec3f, // the same after fog, bloxdApplyFog(litColour, l); bloxdDefaultLight adds the emission
     directional: f32,    // summed Lambert from the scene's directional lights (0 when off)
     ambient: vec3f,      // the material's ambient times the scene's
+#ifdef BLOXD_ALPHA
     blockLight: vec3f,   // voxel block light, tone-mapped; 0 without BLOXD_LIGHTING
     skyLight: f32,       // voxel sky light, tone-mapped; 1 without BLOXD_LIGHTING
     ambientLightColour: vec3f, // white without BLOXD_LIGHTING
     skyLightColour: vec3f,     // white without BLOXD_LIGHTING
     heldLight: vec3f,    // held light here, tone-mapped like blockLight, before the ambient boost; 0 out of reach
                          // or without BLOXD_LIGHTING
+#endif
     fogColour: vec3f,    // the game's fog colour. Bloxd's games always have fog, pushed far out when the player
                          // turns it off; black only in a scene with no fog at all
     fogVisibility: f32,  // 1 = no fog, 0 = fully fogged
