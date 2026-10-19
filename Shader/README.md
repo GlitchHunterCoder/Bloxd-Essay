@@ -64,6 +64,32 @@ note from dev before we begin
 
 <summary>
 
+### `> Consts`
+  
+</summary>
+
+```wgsl
+// Half a turn and a full turn, in radians.
+const bloxdPi: f32 = 3.1415926535898;
+const bloxdTau: f32 = 6.2831853071796;
+
+// Bits of the hook inputs' blockFlags: what a face's block is and what it's made of. A block made of several materials
+// has each, as sandstone is sand and rock, so leaves are vegetation and not dirt. Test one with
+// (blockFlags & bloxdBlockFlagRock) != 0.
+const bloxdBlockFlagOpaque: u32 = 1;     // Fully opaque, leaves and ice included. Not glass, water, lava, spawners, or ghost and invisible blocks.
+const bloxdBlockFlagEmissive: u32 = 2;   // Gives off block light, as neon, portals, lamps, Lava and Beacon do. Glowing ores count, however faint.
+const bloxdBlockFlagVegetation: u32 = 4; // Leaves, and the grass on grass blocks, which are dirt too. Not cacti, mushroom blocks or hay.
+const bloxdBlockFlagDirt: u32 = 8;       // Dirt and soil, grass blocks included. Rocky Dirt is rock too.
+const bloxdBlockFlagSand: u32 = 16;      // Sand, Red Sand, and every sandstone, which is rock too.
+const bloxdBlockFlagRock: u32 = 32;      // Stone and its kinds, andesite, diorite, granite, gravel, ores, sandstone, Rocky Dirt, bedrock, obsidian and magma.
+```
+  
+</details>
+
+<details>
+
+<summary>
+
 ### `> Macros`
 
 </summary>
@@ -102,8 +128,8 @@ These can be thought as types
 // === INTERNAL ===
 
 struct BloxdPackInputs {
-    time: f32,
-    originOffset: vec3i,
+    seconds: f32,
+    renderOffset: vec3i,
     sunDirection: vec3f,
     eyePosition: vec3f,
 }
@@ -112,21 +138,21 @@ struct BloxdPackInputs {
 // === EXTERNAL ===
 
 struct BloxdVertexIn {
-    position: vec3f,     // noa-local: world minus bloxdOriginOffset()
+    position: vec3f,     // A render position: world minus bloxdRenderOffset().
     normal: vec3f,
-    blockId: u32,        // the block whose face this is, by its block ID, the same across the face
+    blockFlags: u32,     // What kind of block this face is: bloxdBlockFlag* bits, the same across the face.
 }
 
 struct BloxdVertex {
-    position: vec3f,     // noa-local
+    position: vec3f,     // A render position.
 }
 
 struct BloxdSurfaceIn {
-    colour: vec3f,       // texture x vertex colour (tint x AO, baked together by the mesher)
+    colour: vec3f,       // Texture * vertex colour (tint * AO).
     alpha: f32,
     normal: vec3f,
-    position: vec3f,     // noa-local; see bloxdWorldPosition and bloxdFaceBlock
-    blockId: u32,        // as in BloxdVertexIn
+    position: vec3f,     // A render position; see bloxdWorldPosition and bloxdFaceBlock.
+    blockFlags: u32,     // As in BloxdVertexIn.
 }
 
 struct BloxdSurface {
@@ -134,28 +160,25 @@ struct BloxdSurface {
 #ifdef BLOXD_ALPHA
     alpha: f32,
 #endif
-    emission: vec3f,     // added after lighting, then fogged
+    emission: vec3f,     // Added after lighting, then fogged.
 }
 
 struct BloxdLightIn {
-    litColour: vec3f,    // the engine's lit result for this fragment, from the surface hook's colour: before emission and fog
-    engineColour: vec3f, // the same after fog, bloxdApplyFog(litColour, l); bloxdDefaultLight adds the emission
-    directional: f32,    // summed Lambert from the scene's directional lights (0 when off)
-    ambient: vec3f,      // the material's ambient times the scene's
-#ifdef BLOXD_LIGHTING
-    blockLight: vec3f,   // voxel block light, tone-mapped; 0 without BLOXD_LIGHTING
-    skyLight: f32,       // voxel sky light, tone-mapped; 1 without BLOXD_LIGHTING
-    ambientLightColour: vec3f, // white without BLOXD_LIGHTING
-    skyLightColour: vec3f,     // white without BLOXD_LIGHTING
-    heldLight: vec3f,    // held light here, tone-mapped like blockLight, before the ambient boost; 0 out of reach
-                         // or without BLOXD_LIGHTING
-#endif
-    fogColour: vec3f,    // the game's fog colour. Bloxd's games always have fog, pushed far out when the player
-                         // turns it off; black only in a scene with no fog at all
-    fogVisibility: f32,  // 1 = no fog, 0 = fully fogged
-    position: vec3f,     // as in BloxdSurfaceIn
+    litColour: vec3f,    // The engine's lit result for this fragment, from the surface hook's colour: before emission and fog.
+    directional: f32,    // Summed Lambert from the scene's directional lights (0 when off).
+    ambient: vec3f,      // Ambient light, added to directional.
+    blockLight: vec3f,   // Voxel block light, tone-mapped; 0 without BLOXD_LIGHTING.
+    skyLight: f32,       // Voxel sky light, tone-mapped; 1 without BLOXD_LIGHTING.
+    ambientLightColour: vec3f, // White without BLOXD_LIGHTING.
+    skyLightColour: vec3f,     // White without BLOXD_LIGHTING.
+    heldLight: vec3f,    // Held light here, tone-mapped like blockLight, before the ambient boost; 0 out of reach
+                         // or without BLOXD_LIGHTING.
+    fogColour: vec3f,    // The game's fog colour. Bloxd's games always have fog, pushed far out when the player
+                         // turns it off; black only in a scene with no fog at all.
+    fogVisibility: f32,  // 1 = no fog, 0 = fully fogged.
+    position: vec3f,     // As in BloxdSurfaceIn.
     normal: vec3f,
-    blockId: u32,        // as in BloxdVertexIn
+    blockFlags: u32,     // As in BloxdVertexIn.
 }
 
 struct BloxdLight {
@@ -164,9 +187,9 @@ struct BloxdLight {
 
 // Returned by bloxdOpaqueBehind(), which surface and light hooks may call where BLOXD_SCENE_DEPTH is defined.
 struct BloxdOpaqueBehind {
-    found: bool,         // false where nothing opaque is behind (sky)
-    position: vec3f,     // noa-local; meaningless when !found
-    distance: f32,       // from the eye; meaningless when !found
+    found: bool,         // False where nothing opaque is behind (sky).
+    position: vec3f,     // A render position; meaningless when !found.
+    distance: f32,       // From the eye; meaningless when !found.
 }
 ```
 
@@ -184,20 +207,19 @@ you call these functions to see what bloxd would do, from there you can edit tha
 ```wgsl
 // === HELPER API ===
 
-// bloxdTime() returns to 0 every this many seconds.
-const bloxdTimeWrap: f32 = 3600;
-
-// Seconds, returning to 0 every bloxdTimeWrap.
-fn bloxdTime() -> f32 {
-    return bloxdPackInputs.time;
+// Seconds since the page loaded. In f32, so it counts in steps of under 1 ms for the first 4.5 hours, and of about
+// 4 ms from 9 to 18 hours. bloxdSeconds() % period counts from 0 up to period, then starts again.
+fn bloxdSeconds() -> f32 {
+    return bloxdPackInputs.seconds;
 }
 
-// Whole blocks: a noa-local position plus this is a world position.
-fn bloxdOriginOffset() -> vec3i {
-    return bloxdPackInputs.originOffset;
+// Whole blocks: a render position plus this is a world position. It changes as the player travels, so render positions
+// stay close to the player, and so precise.
+fn bloxdRenderOffset() -> vec3i {
+    return bloxdPackInputs.renderOffset;
 }
 
-// The camera's position, noa-local.
+// The camera's render position.
 fn bloxdEyePosition() -> vec3f {
     return bloxdPackInputs.eyePosition;
 }
@@ -207,37 +229,37 @@ fn bloxdSunDirection() -> vec3f {
     return bloxdPackInputs.sunDirection;
 }
 
-// A noa-local position in world coordinates. In f32, so it loses fine detail far from the world's origin.
+// A render position's world position. In f32, so it loses fine detail far from the world's origin.
 fn bloxdWorldPosition(position: vec3f) -> vec3f {
-    return position + vec3f(bloxdOriginOffset());
+    return position + vec3f(bloxdRenderOffset());
 }
 
 // The world block the face at a fragment's position and normal belongs to, exact anywhere: half a block back inside it.
 fn bloxdFaceBlock(position: vec3f, normal: vec3f) -> vec3i {
-    return vec3i(floor(position - normal * 0.5)) + bloxdOriginOffset();
+    return vec3i(floor(position - normal * 0.5)) + bloxdRenderOffset();
 }
 
 // Fogs colour as the engine fogs this fragment.
-fn bloxdApplyFog(colour: vec3f, l: BloxdLightIn) -> vec3f {
-    return mix(l.fogColour, colour, l.fogVisibility);
+fn bloxdApplyFog(colour: vec3f, light: BloxdLightIn) -> vec3f {
+    return mix(light.fogColour, colour, light.fogVisibility);
 }
 
 // === BLOXD SHADER ===
 
-fn bloxdDefaultVertex(v: BloxdVertexIn) -> BloxdVertex {
-    return BloxdVertex(v.position);
+fn bloxdDefaultVertex(vertex: BloxdVertexIn) -> BloxdVertex {
+    return BloxdVertex(vertex.position);
 }
 
-fn bloxdDefaultSurface(s: BloxdSurfaceIn) -> BloxdSurface {
+fn bloxdDefaultSurface(surface: BloxdSurfaceIn) -> BloxdSurface {
 #ifdef BLOXD_ALPHA
-    return BloxdSurface(s.colour, s.alpha, vec3f(0.0));
+    return BloxdSurface(surface.colour, surface.alpha, vec3f(0.0));
 #else
-    return BloxdSurface(s.colour, vec3f(0.0));
+    return BloxdSurface(surface.colour, vec3f(0.0));
 #endif
 }
 
-fn bloxdDefaultLight(s: BloxdSurface, l: BloxdLightIn) -> BloxdLight {
-    return BloxdLight(l.engineColour + s.emission * l.fogVisibility);
+fn bloxdDefaultLight(surface: BloxdSurface, light: BloxdLightIn) -> BloxdLight {
+    return BloxdLight(bloxdApplyFog(light.litColour + surface.emission, light));
 }
 ```
 
@@ -597,6 +619,153 @@ fn bloxdLiquidSurface(vertex: bloxdSurfaceIn) -> bloxdSurface {}
 fn bloxdLiquidLight(surface: bloxdSurface, light: bloxdLightIn) -> bloxdLight {}
 ```
 
+</details>
+
+<details>
+
+<summary>
+
+## Version 3
+  
+</summary>
+
+```wgsl
+// Engine-provided and read-only, prepended to all packs. apiVersion 3.
+
+// Half a turn and a full turn, in radians.
+const bloxdPi: f32 = 3.1415926535898;
+const bloxdTau: f32 = 6.2831853071796;
+
+// Per frame: the same for every vertex and fragment of a frame. The functions read bloxdPackInputs, the engine's
+// uniforms, which packs can't name. Any function can call them, not only a hook.
+
+// Seconds since the page loaded. In f32, so it counts in steps of under 1 ms for the first 4.5 hours, and of about
+// 4 ms from 9 to 18 hours. bloxdSeconds() % period counts from 0 up to period, then starts again.
+fn bloxdSeconds() -> f32 {
+    return bloxdPackInputs.seconds;
+}
+
+// Whole blocks: a render position plus this is a world position. It changes as the player travels, so render positions
+// stay close to the player, and so precise.
+fn bloxdRenderOffset() -> vec3i {
+    return bloxdPackInputs.renderOffset;
+}
+
+// The camera's render position.
+fn bloxdEyePosition() -> vec3f {
+    return bloxdPackInputs.eyePosition;
+}
+
+// Unit, towards the sun, in world orientation; zero when the sky has no sun.
+fn bloxdSunDirection() -> vec3f {
+    return bloxdPackInputs.sunDirection;
+}
+
+// A render position's world position. In f32, so it loses fine detail far from the world's origin.
+fn bloxdWorldPosition(position: vec3f) -> vec3f {
+    return position + vec3f(bloxdRenderOffset());
+}
+
+// The world block the face at a fragment's position and normal belongs to, exact anywhere: half a block back inside it.
+fn bloxdFaceBlock(position: vec3f, normal: vec3f) -> vec3i {
+    return vec3i(floor(position - normal * 0.5)) + bloxdRenderOffset();
+}
+
+// Bits of the hook inputs' blockFlags: what a face's block is and what it's made of. A block made of several materials
+// has each, as sandstone is sand and rock, so leaves are vegetation and not dirt. Test one with
+// (blockFlags & bloxdBlockFlagRock) != 0.
+const bloxdBlockFlagOpaque: u32 = 1;     // Fully opaque, leaves and ice included. Not glass, water, lava, spawners, or ghost and invisible blocks.
+const bloxdBlockFlagEmissive: u32 = 2;   // Gives off block light, as neon, portals, lamps, Lava and Beacon do. Glowing ores count, however faint.
+const bloxdBlockFlagVegetation: u32 = 4; // Leaves, and the grass on grass blocks, which are dirt too. Not cacti, mushroom blocks or hay.
+const bloxdBlockFlagDirt: u32 = 8;       // Dirt and soil, grass blocks included. Rocky Dirt is rock too.
+const bloxdBlockFlagSand: u32 = 16;      // Sand, Red Sand, and every sandstone, which is rock too.
+const bloxdBlockFlagRock: u32 = 32;      // Stone and its kinds, andesite, diorite, granite, gravel, ores, sandstone, Rocky Dirt, bedrock, obsidian and magma.
+
+struct BloxdVertexIn {
+    position: vec3f,     // A render position: world minus bloxdRenderOffset().
+    normal: vec3f,
+    blockFlags: u32,     // What kind of block this face is: bloxdBlockFlag* bits, the same across the face.
+}
+
+struct BloxdVertex {
+    position: vec3f,     // A render position.
+}
+
+struct BloxdSurfaceIn {
+    colour: vec3f,       // Texture * vertex colour (tint * AO).
+    alpha: f32,
+    normal: vec3f,
+    position: vec3f,     // A render position; see bloxdWorldPosition and bloxdFaceBlock.
+    blockFlags: u32,     // As in BloxdVertexIn.
+}
+
+struct BloxdSurface {
+    colour: vec3f,
+#ifdef BLOXD_ALPHA
+    alpha: f32,
+#endif
+    emission: vec3f,     // Added after lighting, then fogged.
+}
+
+struct BloxdLightIn {
+    litColour: vec3f,    // The engine's lit result for this fragment, from the surface hook's colour: before emission and fog.
+    directional: f32,    // Summed Lambert from the scene's directional lights (0 when off).
+    ambient: vec3f,      // Ambient light, added to directional.
+    blockLight: vec3f,   // Voxel block light, tone-mapped; 0 without BLOXD_LIGHTING.
+    skyLight: f32,       // Voxel sky light, tone-mapped; 1 without BLOXD_LIGHTING.
+    ambientLightColour: vec3f, // White without BLOXD_LIGHTING.
+    skyLightColour: vec3f,     // White without BLOXD_LIGHTING.
+    heldLight: vec3f,    // Held light here, tone-mapped like blockLight, before the ambient boost; 0 out of reach
+                         // or without BLOXD_LIGHTING.
+    fogColour: vec3f,    // The game's fog colour. Bloxd's games always have fog, pushed far out when the player
+                         // turns it off; black only in a scene with no fog at all.
+    fogVisibility: f32,  // 1 = no fog, 0 = fully fogged.
+    position: vec3f,     // As in BloxdSurfaceIn.
+    normal: vec3f,
+    blockFlags: u32,     // As in BloxdVertexIn.
+}
+
+struct BloxdLight {
+    colour: vec3f,
+}
+
+// Returned by bloxdOpaqueBehind(), which surface and light hooks may call where BLOXD_SCENE_DEPTH is defined.
+struct BloxdOpaqueBehind {
+    found: bool,         // False where nothing opaque is behind (sky).
+    position: vec3f,     // A render position; meaningless when !found.
+    distance: f32,       // From the eye; meaningless when !found.
+}
+
+fn bloxdDefaultVertex(vertex: BloxdVertexIn) -> BloxdVertex {
+    return BloxdVertex(vertex.position);
+}
+
+fn bloxdDefaultSurface(surface: BloxdSurfaceIn) -> BloxdSurface {
+#ifdef BLOXD_ALPHA
+    return BloxdSurface(surface.colour, surface.alpha, vec3f(0.0));
+#else
+    return BloxdSurface(surface.colour, vec3f(0.0));
+#endif
+}
+
+// Fogs colour as the engine fogs this fragment.
+fn bloxdApplyFog(colour: vec3f, light: BloxdLightIn) -> vec3f {
+    return mix(light.fogColour, colour, light.fogVisibility);
+}
+
+fn bloxdDefaultLight(surface: BloxdSurface, light: BloxdLightIn) -> BloxdLight {
+    return BloxdLight(bloxdApplyFog(light.litColour + surface.emission, light));
+}
+
+fn bloxdTerrainVertex(vertex: bloxdVertexIn) -> bloxdVertex {}
+fn bloxdTerrainSurface(vertex: bloxdSurfaceIn) -> bloxdSurface {}
+fn bloxdTerrainLight(surface: bloxdSurface, light: bloxdLightIn) -> bloxdLight {}
+
+fn bloxdLiquidVertex(vertex: bloxdVertexIn) -> bloxdVertex {}
+fn bloxdLiquidSurface(vertex: bloxdSurfaceIn) -> bloxdSurface {}
+fn bloxdLiquidLight(surface: bloxdSurface, light: bloxdLightIn) -> bloxdLight {}
+```
+  
 </details>
 
 </details>
