@@ -290,7 +290,7 @@ Now we got close to figuring it out but thankfully Slushie showed us how it work
 ```js
 done=[] //already executed blocks
 stack=[] //waiting to be executed
-Chain(pos){
+function Chain(pos){
   try{
     let output = exec(pos) //if runs successfully, continue on, general name for execution of board or code block
     let [x,y,z] = pos
